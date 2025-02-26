@@ -3,7 +3,7 @@
 
 // SPDX-License-Identifier: Ecosystem
 
-pragma solidity 0.8.25;
+pragma solidity ^0.8.24;
 
 import {TokenRemote} from "./TokenRemote.sol";
 import {TokenRemoteSettings} from "./interfaces/ITokenRemote.sol";
@@ -20,6 +20,9 @@ import {ERC20Upgradeable} from
 import {SafeERC20TransferFrom} from "@utilities/SafeERC20TransferFrom.sol";
 import {CallUtils} from "@utilities/CallUtils.sol";
 import {ICMInitializable} from "@utilities/ICMInitializable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable@5.0.2/access/AccessControlUpgradeable.sol";
+import {ERC20BurnableUpgradeable} from "@openzeppelin/contracts-upgradeable@5.0.2/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
+import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable@5.0.2/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 
 /**
  * @title ERC20TokenRemoteUpgradeable
@@ -27,7 +30,7 @@ import {ICMInitializable} from "@utilities/ICMInitializable.sol";
  * and represents the received tokens with an ERC20 token on this chain.
  * @custom:security-contact https://github.com/ava-labs/icm-contracts/blob/main/SECURITY.md
  */
-contract ERC20TokenRemoteUpgradeable is IERC20TokenTransferrer, ERC20Upgradeable, TokenRemote {
+contract ERC20TokenRemoteUpgradeable is IERC20TokenTransferrer, ERC20Upgradeable,ERC20BurnableUpgradeable, AccessControlUpgradeable, ERC20PermitUpgradeable, TokenRemote {
     // solhint-disable private-vars-leading-underscore
     /**
      * @dev Namespace storage slots following the ERC-7201 standard to prevent
@@ -46,6 +49,8 @@ contract ERC20TokenRemoteUpgradeable is IERC20TokenTransferrer, ERC20Upgradeable
      */
     bytes32 public constant ERC20_TOKEN_REMOTE_STORAGE_LOCATION =
         0x9b9029a3537fcf0e984763da4ac33bbf592a3462819171bf424e91cf62622300;
+
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     // solhint-disable ordering
     function _getERC20TokenRemoteStorage()
@@ -92,6 +97,17 @@ contract ERC20TokenRemoteUpgradeable is IERC20TokenTransferrer, ERC20Upgradeable
         __ERC20_init(tokenName, tokenSymbol);
         __TokenRemote_init(settings, 0, tokenDecimals);
         __ERC20TokenRemote_init_unchained(tokenDecimals);
+
+        __ERC20Burnable_init();
+        __AccessControl_init();
+        __ERC20Permit_init("TOKEN");
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(MINTER_ROLE, msg.sender);
+
+    }
+
+    function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
+        _mint(to, amount);
     }
 
     // solhint-disable-next-line func-name-mixedcase
